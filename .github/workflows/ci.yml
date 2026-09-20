@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # ENGINEERING.md §5.2: "chain-config addresses match contracts deployments"
+      # is asserted by test/invariant.test.ts against a sibling checkout of
+      # `contracts`. That repo is private, and the job's GITHUB_TOKEN cannot read
+      # other private repos, so this step needs a fine-grained PAT with
+      # contents:read on Konstellation-Network/contracts stored as the
+      # CONTRACTS_READ_TOKEN secret. Without one the step fails, the test skips
+      # with a message, and the rest of the job still runs — the invariant is
+      # then only enforced locally. Once `contracts` is public the fallback
+      # github.token is enough and the secret can go.
+      - name: Check out contracts (for the §5.2 invariant test)
+        id: contracts
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Konstellation-Network/contracts
+          token: ${{ secrets.CONTRACTS_READ_TOKEN || github.token }}
+          path: .siblings/contracts
+          sparse-checkout: preinstalls
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+        env:
+          # Absent when the checkout above failed: the test then skips, loudly.
+          KONSTELLATION_CONTRACTS_DIR: ${{ steps.contracts.outcome == 'success' && format('{0}/.siblings/contracts', github.workspace) || '' }}
+
+      - name: Warn if the §5.2 invariant test could not run
+        if: steps.contracts.outcome != 'success'
+        run: echo "::warning::ENGINEERING.md §5.2 invariant not checked in CI — the contracts checkout failed (set the CONTRACTS_READ_TOKEN secret, or make contracts public). The test still runs locally against ../contracts."
