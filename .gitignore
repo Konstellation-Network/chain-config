@@ -1,2 +1,6 @@
+# chain-config
 .DS_Store
 node_modules/
+dist/
+# CI checks out sibling repos here for the §5.2 invariant test
+.siblings/
