@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # ENGINEERING.md §5.2: "chain-config addresses match contracts deployments"
       # is asserted by test/invariant.test.ts against sibling checkouts of
@@ -21,26 +23,39 @@ jobs:
       # addresses, chain ids, denom, embedded preinstalls). Both repos are
       # private and the job's GITHUB_TOKEN cannot read other private repos, so
       # these steps need a fine-grained PAT with contents:read on both repos
-      # stored as the CONTRACTS_READ_TOKEN secret. Without one the steps fail,
-      # the tests skip with a message, and the rest of the job still runs — the
-      # invariant is then only enforced locally. Once the repos are public the
-      # fallback github.token is enough and the secret can go.
+      # stored as the CONTRACTS_READ_TOKEN secret.
       #
-      # Whenever a checkout DID succeed, KONSTELLATION_REQUIRE_SIBLINGS=1 makes
-      # the test fail rather than skip if it cannot find the files, so a wrong
-      # path or sparse pattern can never turn into a green run.
+      # A failed checkout FAILS THE JOB (the "Fail: …" steps below): a green
+      # check must mean the invariant ran. `continue-on-error` on the checkout
+      # itself only keeps the failure message readable. Consequences, intended:
+      # - a PR from a fork has no secrets → red until re-run from an org branch;
+      # - a missing/expired token → red until a maintainer sets it.
+      # Once the repos are public the fallback github.token is enough and the
+      # secret can go.
+      #
+      # `ref: vesting-d12` on contracts: the WKASH pin
+      # (test/DeployWKASH.t.sol) lives on that branch until contracts PR
+      # "vesting-d12" merges. Drop the `ref` line then — the checkout going red
+      # when the branch is deleted is the reminder.
       - name: Check out contracts (for the §5.2 invariant test)
         id: contracts
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Konstellation-Network/contracts
+          ref: vesting-d12
           token: ${{ secrets.CONTRACTS_READ_TOKEN || github.token }}
           path: .siblings/contracts
           sparse-checkout: |
             preinstalls
             test
           persist-credentials: false
+
+      - name: "Fail: contracts could not be checked out — the §5.2 invariant cannot run"
+        if: steps.contracts.outcome != 'success'
+        run: |
+          echo "::error::ENGINEERING.md §5.2 invariant not checked: the Konstellation-Network/contracts checkout failed. Set the CONTRACTS_READ_TOKEN secret (fine-grained PAT, contents:read on contracts and konstellation) or, for a fork PR, re-run from an org branch. See .github/workflows/ci.yml."
+          exit 1
 
       - name: Check out konstellation (for the §5.2 invariant test)
         id: konstellation
@@ -56,6 +71,12 @@ jobs:
             x/compliance/precompile
           persist-credentials: false
 
+      - name: "Fail: konstellation could not be checked out — the §5.2 invariant cannot run"
+        if: steps.konstellation.outcome != 'success'
+        run: |
+          echo "::error::precompile addresses / chain ids not checked against konstellation: the Konstellation-Network/konstellation checkout failed. Set the CONTRACTS_READ_TOKEN secret with read access to it, or re-run from an org branch. See .github/workflows/ci.yml."
+          exit 1
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
@@ -64,17 +85,16 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      # `npm test` runs the src tests, the §5.2 invariant against the two
+      # checkouts above, and test/dist.test.ts against the dist/ just built
+      # (pretest rebuilds it — cheap, and the published artifact is what
+      # gets asserted, not the sources).
       - run: npm test
         env:
-          # Empty when the checkout above failed: the test then skips, loudly.
-          KONSTELLATION_CONTRACTS_DIR: ${{ steps.contracts.outcome == 'success' && format('{0}/.siblings/contracts', github.workspace) || '' }}
-          KONSTELLATION_CHAIN_DIR: ${{ steps.konstellation.outcome == 'success' && format('{0}/.siblings/konstellation', github.workspace) || '' }}
-          KONSTELLATION_REQUIRE_SIBLINGS: ${{ (steps.contracts.outcome == 'success' && steps.konstellation.outcome == 'success') && '1' || '' }}
-
-      - name: Warn if the §5.2 invariant test could not run against contracts
-        if: steps.contracts.outcome != 'success'
-        run: echo "::warning::ENGINEERING.md §5.2 invariant not checked in CI — the contracts checkout failed (set the CONTRACTS_READ_TOKEN secret, or make contracts public). The test still runs locally against ../contracts."
-
-      - name: Warn if the §5.2 invariant test could not run against konstellation
-        if: steps.konstellation.outcome != 'success'
-        run: echo "::warning::precompile addresses / chain ids not checked against konstellation in CI — the konstellation checkout failed (set the CONTRACTS_READ_TOKEN secret with read access to it, or make it public). The test still runs locally against ../konstellation."
+          KONSTELLATION_CONTRACTS_DIR: ${{ github.workspace }}/.siblings/contracts
+          KONSTELLATION_CHAIN_DIR: ${{ github.workspace }}/.siblings/konstellation
+          # Both checkouts succeeded if we got here; an unfindable sibling is
+          # then a bug in this file, and must fail, not skip.
+          KONSTELLATION_REQUIRE_SIBLINGS: "1"
+      - name: Pack (dry run) — list exactly what `npm publish` would ship
+        run: npm pack --dry-run

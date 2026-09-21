@@ -80,6 +80,48 @@ function readJson<T>(file: string): T {
   return JSON.parse(readFileSync(file, "utf8")) as T;
 }
 
+/**
+ * Remove `/* … *\/` and `// …` comments from Go or Solidity source without
+ * touching string literals, so a commented-out `EXPECTED_WKASH = …` or a
+ * `// Address = "0x…"` can never satisfy (or fool) a match below.
+ */
+function stripComments(src: string): string {
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i]!;
+    const next = src[i + 1];
+    if (c === '"' || c === "'" || c === "`") {
+      // string literal: copy verbatim, honouring backslash escapes (not in raw ` strings)
+      let j = i + 1;
+      while (j < src.length && src[j] !== c) {
+        if (src[j] === "\\" && c !== "`") j++;
+        j++;
+      }
+      out += src.slice(i, j + 1);
+      i = j + 1;
+    } else if (c === "/" && next === "*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end === -1 ? src.length : end + 2;
+      out += " ";
+    } else if (c === "/" && next === "/") {
+      const end = src.indexOf("\n", i);
+      i = end === -1 ? src.length : end;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
+
+/** The single capture of `re` (which must carry the `g` flag) in `src`; fails on 0 or >1 matches. */
+function exactlyOne(src: string, re: RegExp, what: string): string {
+  const matches = [...src.matchAll(re)].map((m) => m[1]).filter((v): v is string => v !== undefined);
+  assert.equal(matches.length, 1, `${what}: expected exactly one definition, found ${matches.length}${matches.length ? ` (${matches.join(", ")})` : ""}`);
+  return matches[0]!;
+}
+
 describe("§5.2 invariant: chain-config addresses match contracts", () => {
   // Collected up front so that a present sibling with a missing/renamed
   // preinstalls directory is a failure below, never a silent skip.
@@ -120,10 +162,22 @@ describe("§5.2 invariant: chain-config addresses match contracts", () => {
 
   it("WKASH address matches the pin in contracts/test/DeployWKASH.t.sol", { skip: skipContracts }, () => {
     assert.ok(existsSync(wkashPinFile), `${wkashPinFile} not found — was the WKASH pin moved?`);
-    const src = readFileSync(wkashPinFile, "utf8");
-    const m = src.match(/^\s*address\s+(?:\w+\s+)*constant\s+EXPECTED_WKASH\s*=\s*(0x[0-9a-fA-F]{40})\s*;/m);
-    assert.ok(m?.[1], `EXPECTED_WKASH constant not found in ${wkashPinFile}`);
-    assert.equal(contracts.wkash.toLowerCase(), m[1].toLowerCase(), `package has ${contracts.wkash}, contracts pins ${m[1]}`);
+    const src = stripComments(readFileSync(wkashPinFile, "utf8"));
+    // Anchor to the pinning contract: only its own EXPECTED_WKASH counts, so a
+    // second contract in the file (or a commented-out old value) cannot match.
+    // `[ \t]*`, not `\s*`: `\s*` would swallow preceding blank lines and make
+    // the "next contract" search below find this same contract again.
+    const contractMatches = [...src.matchAll(/^[ \t]*contract[ \t]+DeployWKASHTest\b[^{]*\{/gm)];
+    assert.equal(contractMatches.length, 1, `expected exactly one \`contract DeployWKASHTest\` in ${wkashPinFile}`);
+    const start = contractMatches[0]!.index + contractMatches[0]![0].length;
+    const nextContract = src.slice(start).search(/^[ \t]*(?:abstract[ \t]+)?(?:contract|library|interface)[ \t]+\w+/m);
+    const body = nextContract === -1 ? src.slice(start) : src.slice(start, start + nextContract);
+    const pinned = exactlyOne(
+      body,
+      /^\s*address\s+(?:\w+\s+)*constant\s+EXPECTED_WKASH\s*=\s*(0x[0-9a-fA-F]{40})\s*;/gm,
+      "DeployWKASHTest.EXPECTED_WKASH",
+    );
+    assert.equal(contracts.wkash.toLowerCase(), pinned.toLowerCase(), `package has ${contracts.wkash}, contracts pins ${pinned}`);
   });
 });
 
@@ -131,15 +185,15 @@ describe("precompile addresses, chain ids and denom match konstellation", () => 
   /**
    * Value of a Go constant in a file under the chain repo: `NAME [type] = "..."`
    * inside a `const (...)` block, or a single-line `const NAME = "..."`.
-   * Line-anchored, so `EVMChainIDMainnet` cannot match inside another name.
+   * Comments are stripped first, the match is line-anchored (so
+   * `EVMChainIDMainnet` cannot match inside another name), and there must be
+   * exactly one definition.
    */
   const goConst = (file: string, name: string): string => {
     const full = path.join(chainDir, file);
     assert.ok(existsSync(full), `${full} not found — was it moved?`);
-    const src = readFileSync(full, "utf8");
-    const m = src.match(new RegExp(`^\\s*(?:const\\s+)?${name}\\s+(?:\\w+\\s+)?=\\s*"?([-\\w.]+)"?`, "m"));
-    assert.ok(m?.[1], `${file}: could not find const ${name}`);
-    return m[1];
+    const src = stripComments(readFileSync(full, "utf8"));
+    return exactlyOne(src, new RegExp(`^\\s*(?:const\\s+)?${name}\\s+(?:\\w+\\s+)?=\\s*"?([-\\w.]+)"?`, "gm"), `${file}: const ${name}`);
   };
 
   it("ICompliance precompile address", { skip: skipChain }, () => {

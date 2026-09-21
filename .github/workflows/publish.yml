@@ -1,0 +1,67 @@
+name: publish
+
+# Publishes to npm with trusted publishing (OIDC): no npm token is stored
+# anywhere, the registry verifies the GitHub Actions identity and records
+# provenance. NOT active yet — every gate below fails until:
+#   1. the npm org `@konstellation-network` is claimed (STATUS.md §5a P25/P6);
+#   2. `konstellation-network/chain-config` is registered as a trusted
+#      publisher for the package on npmjs.com (Settings → Publishing access);
+#   3. a LICENSE is chosen (P6) and `"private": true` is removed from package.json;
+#   4. a `v*` tag is pushed whose version equals package.json's.
+# Until then a tag push is a red run, by design. Nothing here publishes on a
+# branch push or a PR.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm trusted publishing + provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Refuse to publish a private package or a version that is not the tag
+        run: |
+          set -eu
+          private=$(node -p "require('./package.json').private === true")
+          version=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$private" = "true" ]; then
+            echo "::error::package.json is still \"private\": true — the npm org is not claimed / LICENSE not decided (STATUS §5a P6, P25)."; exit 1
+          fi
+          if [ "$version" != "$tag" ]; then
+            echo "::error::tag v$tag does not match package.json version $version"; exit 1
+          fi
+          if [ ! -f LICENSE ]; then
+            echo "::error::no LICENSE file — choose one before publishing (STATUS §5a P6)."; exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+        env:
+          # No sibling checkouts here: the release is cut from a commit whose
+          # CI (ci.yml) already ran the §5.2 invariant. Explicitly unset so the
+          # invariant tests skip rather than fail on the default paths.
+          KONSTELLATION_REQUIRE_SIBLINGS: ""
+
+      # npm >= 11.5 with an OIDC-capable runner performs trusted publishing when
+      # no token is configured; --provenance attaches the SLSA attestation.
+      - run: npm publish --provenance --access public

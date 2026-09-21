@@ -6,9 +6,19 @@ shaped for [viem](https://viem.sh), [wagmi](https://wagmi.sh) and EIP-3085
 
 > **Not yet published.** Nothing is deployed: no public RPC, no explorer, no
 > testnet. This package is being built ahead of testnet-1 so dapps can integrate
-> against the final chain ids and addresses. `package.json` is `"private": true`
-> until the first release is cut; the `@konstellation-network` npm scope is a
-> placeholder that has to be claimed first.
+> against the final chain ids and addresses.
+>
+> ```sh
+> npm install @konstellation-network/chain-config   # not yet published — see below
+> ```
+>
+> `package.json` is `"private": true` until: the npm org `@konstellation-network`
+> is claimed (it is **not** ours yet, and `@konstellation` belongs to someone
+> else — the org will be created before any repo goes public, STATUS §5a
+> P25/P6), a LICENSE is chosen for the org (no repo has one yet, P6), and
+> `.github/workflows/publish.yml` — npm trusted publishing with provenance,
+> gated on a `v*` tag — is enabled by registering this repo as the package's
+> trusted publisher. Until then the install line above does nothing useful.
 
 ## What is in it
 
@@ -21,7 +31,7 @@ shaped for [viem](https://viem.sh), [wagmi](https://wagmi.sh) and EIP-3085
 | `baseDenom`, `bech32Prefix` | `esp` (1 KASH = 10<sup>18</sup> esp), `kons` |
 | `contracts` | `{ preinstalls, precompiles, wkash }` — every canonical address, see below |
 | `chainContracts` | the same addresses in viem's `ChainContract` shape; what each network's `.contracts` is |
-| `networks`, `networksById`, `getNetworkById` | the three networks keyed by export name / literal chain id, and a lookup for any `number` |
+| `networks`, `networksById`, `getNetworkById` | the three networks keyed by export name / literal chain id, and a lookup taking a `number`, a decimal string, or the `0x…` hex string wallets return |
 | `addEthereumChainParameters`, `toAddEthereumChainParameter`, `toHexChainId` | EIP-3085 helpers |
 
 Every network object is a valid viem `Chain` **plus** `cosmosChainId`,
@@ -35,7 +45,7 @@ Preinstalls — real bytecode written into `genesis.json`, usable from block 0:
 
 | Key | Address | Origin |
 |---|---|---|
-| `create2` | `0x4e59b44847b379578588920cA78FbF26c0B4956C` | cosmos/evm default (deterministic-deployment proxy) |
+| `create2` | `0x4e59b44847b379578588920cA78FbF26c0B4956C` | cosmos/evm default: Arachnid's deterministic-deployment proxy (raw `CREATE2`, calldata `salt ‖ initCode`; what Foundry's `new X{salt}` uses) |
 | `multicall3` | `0xcA11bde05977b3631167028862bE2a173976CA11` | cosmos/evm default, also pinned in `contracts` |
 | `permit2` | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | cosmos/evm default, also pinned in `contracts` |
 | `safeSingletonFactory` | `0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7` | cosmos/evm default |
@@ -44,17 +54,25 @@ Preinstalls — real bytecode written into `genesis.json`, usable from block 0:
 | `senderCreatorV07` | `0xEFC2c1444eBCC4Db75e7613d20C6a62fF67A167C` | `contracts/preinstalls` (required by EntryPoint v0.7) |
 | `entryPointV08` | `0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108` | `contracts/preinstalls` (ERC-4337 v0.8) |
 | `senderCreatorV08` | `0x449ED7C3e6Fee6a97311d4b55475DF59C44AdD33` | `contracts/preinstalls` (required by EntryPoint v0.8) |
-| `create2Deployer` | `0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2` | `contracts/preinstalls` (hardhat-deploy / Defender) |
+| `create2Deployer` | `0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2` | `contracts/preinstalls`: hardhat-deploy / OpenZeppelin Defender `Create2Deployer` (`deploy(value, salt, code)`, `computeAddress`); what `DeployWKASH.s.sol` uses |
 
-Precompiles — native code at a fixed address, no bytecode:
+`create2` and `create2Deployer` are two different factories with different
+calling conventions and address derivations — they are not interchangeable.
+
+Precompiles — native Go code at a fixed address:
 
 | Key | Address | What |
 |---|---|---|
 | `p256` | `0x…0100` | secp256r1 verification (EIP-7212), passkey wallets |
 | `bech32` | `0x…0400` | bech32 <-> hex |
-| `staking` … `ics02` | `0x…0800` – `0x…0807` | cosmos/evm's staking, distribution, ics20, vesting, bank, gov, slashing, ics02 |
+| `staking`, `distribution`, `ics20`, `bank`, `gov`, `slashing`, `ics02` | `0x…0800`, `…0801`, `…0802`, `…0804`, `…0805`, `…0806`, `…0807` | cosmos/evm's static precompiles; `eth_getCode` on them is empty |
 | `compliance` | `0x…0900` | Konstellation `ICompliance`: `isVerified(address)`, `isFrozen(address)` (D6) |
-| `werc20` | `0xD4949664cD82660AaE99bEdc034a0deA8A0bd517` | cosmos/evm's `werc20` native precompile exposing `esp` through the ERC-20 interface |
+| `werc20` | `0xD4949664cD82660AaE99bEdc034a0deA8A0bd517` | cosmos/evm's `werc20` *dynamic* precompile exposing `esp` through the ERC-20 interface; unlike the others it does have bytecode at its address (a ~13 kB placeholder) |
+
+Not included, on purpose: `0x…0803` (`vesting`). cosmos/evm v0.7.3 lists it and
+the chain's genesis marks it active, but upstream ships no implementation, so
+every `eth_call`/tx to it fails with `precompiled contract not stored in
+memory` (STATUS §5a P24). It comes back only once a call succeeds on a node.
 
 Post-genesis deploy — known address, no code until the deploy script has run on
 that network:
@@ -100,6 +118,22 @@ export const config = createConfig({
 });
 ```
 
+`switchChain({ chainId: testnet.id })` will fail on a wallet that does not
+already know the network: wagmi falls back to `wallet_addEthereumChain` with
+the chain's own `rpcUrls`, which are empty here, and MetaMask requires at
+least one `https://` RPC. Until endpoints are published, pass the parameter
+yourself:
+
+```ts
+import { switchChain } from "@wagmi/core";
+import { testnet, toAddEthereumChainParameter } from "@konstellation-network/chain-config";
+
+await switchChain(config, {
+  chainId: testnet.id,
+  addEthereumChainParameter: toAddEthereumChainParameter(testnet, { rpcUrls: ["https://<your-testnet-rpc>"] }),
+});
+```
+
 ### Add the network to a wallet (EIP-3085)
 
 ```ts
@@ -121,6 +155,11 @@ is something to put in them: MetaMask Mobile and the extension up to v12
 reject `[]`, while an absent key is accepted (viem omits it too). Passing
 `{ blockExplorerUrls: [] }` as an override is also normalised to "absent".
 
+Every URL in `overrides` is checked up front — `https://` or `wss://`, or
+`http://` / `ws://` on `localhost` / `127.0.0.1` / `[::1]` only — and a bad
+one throws a `TypeError` immediately, with the field name, instead of an
+opaque wallet error later.
+
 ### Contract addresses
 
 ```ts
@@ -133,6 +172,9 @@ contracts.wkash;                     // "0x34Ab8285C63b876717C2c56151700D0262355
 ```
 
 Every exported object is deep-frozen; mutating one throws in strict mode.
+The `Address` type is `` `0x${string}` `` — every address shipped here is
+EIP-55 checksummed (tested), but the type cannot enforce that on values you
+build yourself; validate those with viem's `isAddress(x, { strict: true })`.
 
 ### Cosmos side
 
@@ -163,6 +205,11 @@ test time and asserts:
   `app/config/chain.go`);
 - the preinstalls `konstellation/app/preinstalls` embeds are the same set.
 
+The parsers strip Go/Solidity comments first, require exactly one definition
+of each constant, and take `EXPECTED_WKASH` only from inside
+`contract DeployWKASHTest`, so a commented-out old value or a decoy contract
+cannot satisfy them.
+
 The paths default to `../contracts` and `../konstellation`; override with
 `KONSTELLATION_CONTRACTS_DIR` / `KONSTELLATION_CHAIN_DIR`. A sibling missing
 from its default location **skips** its tests with a message (and they count
@@ -170,9 +217,25 @@ as skipped in the summary), never passes silently. It is a **failure** when the
 env var is set explicitly and points nowhere, when
 `KONSTELLATION_REQUIRE_SIBLINGS=1`, or when the sibling is there but the
 expected files are not (a moved `preinstalls/` directory is a failure, not a
-skip). In CI both repos are checked out sparsely with a read token because
-they are private (see `.github/workflows/ci.yml`); the env vars are set only
-for a checkout that succeeded, and the workflow warns for each that did not.
+skip).
+
+**In CI the invariant always runs or the job is red.** Both repos are checked
+out sparsely with a read token because they are private
+(`.github/workflows/ci.yml`, secret `CONTRACTS_READ_TOKEN`); a failed checkout
+fails the job with an explanatory `::error::`. Intended consequences: a PR from
+a fork (no secrets) is red until it is re-run from an org branch, and a
+missing or expired token is red until a maintainer sets it. Until the
+`contracts` branch `vesting-d12` (where `test/DeployWKASH.t.sol` lives) merges,
+CI checks `contracts` out at that branch; drop the `ref:` line afterwards.
+
+### The published artifact is tested too
+
+`test/dist.test.ts` loads `dist/esm/index.js` and `dist/cjs/index.js` — the
+files `package.json#exports` serves — after a build and asserts that every
+export deep-equals the `src` export, that both flavours agree, that they are
+deep-frozen, and that the functions behave identically. `npm test` builds
+first (`pretest`); `prepack` runs it again so a tarball is never produced from
+an untested `dist/`.
 
 The other five preinstalls come from cosmos/evm v0.7.3's
 `x/vm/types.DefaultPreinstalls` and are not re-checked here; they change only
@@ -192,7 +255,7 @@ with a cosmos/evm bump, which `konstellation/app/upstream_pin_test.go` flags.
 npm install
 npm run typecheck   # tsc --noEmit over src and test
 npm run build       # dist/esm + dist/cjs + .d.ts (tsc, no bundler)
-npm test            # node:test
+npm test            # builds, then node:test over src, the §5.2 invariant, and dist/
 ```
 
 Dev dependencies only: `typescript`, `@types/node`, and `viem` for the

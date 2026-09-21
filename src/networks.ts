@@ -120,7 +120,23 @@ export const networksById = /* @__PURE__ */ deepFreeze({
   [localnet.id]: localnet,
 } as const);
 
-/** Look a network up by EIP-155 chain id; `undefined` for an id that is not Konstellation's. */
-export function getNetworkById(id: number): KonstellationChain | undefined {
-  return (networksById as Readonly<Record<number, KonstellationChain | undefined>>)[id];
+/**
+ * Look a network up by EIP-155 chain id: a number, a decimal string, or the
+ * `0x`-hex string wallets return from `eth_chainId` / `chainChanged`.
+ * `undefined` for anything else — including prototype keys such as
+ * `"__proto__"`, which never reach the object.
+ */
+export function getNetworkById(id: number | string): KonstellationChain | undefined {
+  let n: number;
+  if (typeof id === "number") {
+    n = id;
+  } else if (/^0x[0-9a-fA-F]{1,13}$/.test(id)) {
+    n = Number.parseInt(id, 16);
+  } else if (/^[0-9]{1,15}$/.test(id)) {
+    n = Number(id);
+  } else {
+    return undefined;
+  }
+  if (!Number.isSafeInteger(n) || n <= 0 || !Object.hasOwn(networksById, n)) return undefined;
+  return networksById[n as keyof typeof networksById];
 }

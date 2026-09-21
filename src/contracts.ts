@@ -25,9 +25,14 @@ export const preinstalls: PreinstallAddresses = /* @__PURE__ */ deepFreeze({
 
 /**
  * Static precompiles active in genesis (`konstellation/app/genesis.go`:
- * cosmos/evm's `AvailableStaticPrecompiles` plus the compliance precompile)
- * and the werc20 native precompile for the base denom
- * (`konstellation/app/config/chain.go` `WKASHPrecompile`).
+ * cosmos/evm's `AvailableStaticPrecompiles` plus the compliance precompile),
+ * in cosmos/evm v0.7.3's `AvailableStaticPrecompiles` order, and the werc20
+ * native precompile for the base denom (`konstellation/app/config/chain.go`
+ * `WKASHPrecompile`).
+ *
+ * `0x…0803` (`vesting`) is intentionally absent: listed and marked active
+ * upstream, but v0.7.3 ships no implementation and every call to it fails
+ * (STATUS.md §5a P24). Add it back only once a call succeeds on a dev node.
  */
 export const precompiles: PrecompileAddresses = /* @__PURE__ */ deepFreeze({
   p256: "0x0000000000000000000000000000000000000100",
@@ -35,7 +40,6 @@ export const precompiles: PrecompileAddresses = /* @__PURE__ */ deepFreeze({
   staking: "0x0000000000000000000000000000000000000800",
   distribution: "0x0000000000000000000000000000000000000801",
   ics20: "0x0000000000000000000000000000000000000802",
-  vesting: "0x0000000000000000000000000000000000000803",
   bank: "0x0000000000000000000000000000000000000804",
   gov: "0x0000000000000000000000000000000000000805",
   slashing: "0x0000000000000000000000000000000000000806",

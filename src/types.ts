@@ -1,4 +1,9 @@
-/** A 0x-prefixed, EIP-55 checksummed, 20-byte hex address. */
+/**
+ * A 0x-prefixed 20-byte hex address. Every address this package ships is
+ * EIP-55 checksummed (tested), but the type itself cannot enforce that —
+ * run `getAddress`/`isAddress(x, { strict: true })` from viem if you need to
+ * validate one you did not get from here.
+ */
 export type Address = `0x${string}`;
 
 /**
@@ -51,7 +56,13 @@ export interface ChainContract {
  * there) and cosmos/evm's `x/vm/types.DefaultPreinstalls` (the other five).
  */
 export interface PreinstallAddresses {
-  /** Deterministic-deployment proxy (Arachnid's `CREATE2` factory). cosmos/evm default. */
+  /**
+   * Arachnid's deterministic-deployment proxy: raw `CREATE2`, calldata =
+   * `salt ‖ initCode`, used by Foundry's default `new X{salt: …}()` path and
+   * many tooling defaults. NOT interchangeable with `create2Deployer` below,
+   * which has a Solidity ABI (`deploy(value, salt, code)`) and a different
+   * address-derivation input. cosmos/evm default.
+   */
   readonly create2: Address;
   /** Multicall3. cosmos/evm default; also pinned in `contracts`. */
   readonly multicall3: Address;
@@ -69,15 +80,28 @@ export interface PreinstallAddresses {
   readonly entryPointV08: Address;
   /** SenderCreator that EntryPoint v0.8's bytecode hard-references. Pinned in `contracts`. */
   readonly senderCreatorV08: Address;
-  /** hardhat-deploy / OpenZeppelin Defender `Create2Deployer`. Pinned in `contracts`. */
+  /**
+   * hardhat-deploy / OpenZeppelin Defender `Create2Deployer`
+   * (`deploy(uint256 value, bytes32 salt, bytes code)`, `computeAddress`).
+   * The one `contracts/script/DeployWKASH.s.sol` uses. Not interchangeable
+   * with `create2` above. Pinned in `contracts`.
+   */
   readonly create2Deployer: Address;
 }
 
 /**
- * Precompiles: native code the EVM exposes at a fixed address; there is no
- * bytecode at these addresses. `0x100`–`0x807` are cosmos/evm's static
- * precompiles (`x/vm/types/precompiles.go`); `0x900` opens Konstellation's
- * own range (`konstellation/x/compliance/precompile`).
+ * Precompiles: native Go code the EVM exposes at a fixed address.
+ * `0x100`–`0x807` are cosmos/evm's static precompiles
+ * (`x/vm/types/precompiles.go`) — `eth_getCode` on them returns nothing;
+ * `0x900` opens Konstellation's own range
+ * (`konstellation/x/compliance/precompile`). `werc20` is different: a
+ * *dynamic* precompile that also carries ~13 kB of placeholder bytecode so
+ * tooling sees a contract there.
+ *
+ * cosmos/evm v0.7.3 also lists a `vesting` precompile at `0x…0803` and the
+ * chain's genesis marks it active, but upstream ships no implementation:
+ * any call to it fails with "precompiled contract not stored in memory". It
+ * is deliberately NOT in this map (STATUS.md §5a P24).
  */
 export interface PrecompileAddresses {
   /** secp256r1 signature verification (EIP-7212 / RIP-7212), for passkey wallets. */
@@ -88,8 +112,6 @@ export interface PrecompileAddresses {
   readonly distribution: Address;
   /** IBC ICS-20 transfers. */
   readonly ics20: Address;
-  /** x/auth vesting. Note: Konstellation vests through Solidity contracts (D12), not this. */
-  readonly vesting: Address;
   readonly bank: Address;
   readonly gov: Address;
   readonly slashing: Address;
@@ -100,8 +122,9 @@ export interface PrecompileAddresses {
   /**
    * cosmos/evm's `werc20` native precompile: exposes the base denom (`esp`) to
    * Solidity through the ERC-20 interface, registered as the native token pair
-   * in the erc20 module's genesis. This is NOT the `WKASH` wrapper contract —
-   * see `ContractAddresses.wkash`.
+   * in the erc20 module's genesis. Unlike the static precompiles it has
+   * bytecode at its address (a placeholder the erc20 module writes). This is
+   * NOT the `WKASH` wrapper contract — see `ContractAddresses.wkash`.
    */
   readonly werc20: Address;
 }

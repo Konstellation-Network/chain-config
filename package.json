@@ -30,8 +30,10 @@
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/postbuild.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build",
     "test": "node --test test/*.test.ts",
-    "prepack": "npm run build"
+    "test:dist": "node --test test/dist.test.ts",
+    "prepack": "npm run build && npm run test:dist"
   },
   "repository": {
     "type": "git",
@@ -48,7 +50,8 @@
     "wagmi"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=20"
