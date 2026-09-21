@@ -1,12 +1,13 @@
-import { precompiles, preinstalls } from "./contracts.ts";
+import { precompiles, preinstalls, wkash } from "./contracts.ts";
+import { deepFreeze } from "./freeze.ts";
 import type { Address, ChainContract, KonstellationChain } from "./types.ts";
 
 /** Native token, shared by every network (D2: KASH, base denom `esp`, 18 decimals). */
-export const nativeCurrency = {
+export const nativeCurrency = /* @__PURE__ */ deepFreeze({
   name: "Konstellation",
   symbol: "KASH",
   decimals: 18,
-} as const;
+} as const);
 
 /** Bech32 human-readable part (D3). */
 export const bech32Prefix = "kons";
@@ -30,12 +31,14 @@ function asChainContracts<T extends { readonly [K in keyof T]: Address }>(
 
 /**
  * viem `Chain.contracts` for every network: each preinstall and precompile as a
- * `ChainContract`, `multicall3` among them at its canonical address. Frozen so
- * a dapp cannot mutate the shared object.
+ * `ChainContract` with `blockCreated: 0`, `multicall3` among them at its
+ * canonical address, plus `wkash` (post-genesis deploy, so no `blockCreated`).
+ * Deep-frozen so a dapp cannot mutate the shared object.
  */
-export const chainContracts = Object.freeze({
+export const chainContracts = /* @__PURE__ */ deepFreeze({
   ...asChainContracts(preinstalls),
   ...asChainContracts(precompiles),
+  wkash: { address: wkash } satisfies ChainContract,
 });
 
 /**
@@ -45,7 +48,7 @@ export const chainContracts = Object.freeze({
  * (ENGINEERING.md §6.5, §6.6; `networks/konstellation-1/`). Nothing is
  * deployed yet — do not fill these in with guessed hostnames.
  */
-export const konstellation = {
+export const konstellation = /* @__PURE__ */ deepFreeze({
   id: 5667,
   name: "Konstellation",
   cosmosChainId: "konstellation-1",
@@ -57,7 +60,7 @@ export const konstellation = {
   },
   contracts: chainContracts,
   testnet: false,
-} as const satisfies KonstellationChain;
+} as const satisfies KonstellationChain);
 
 /**
  * Testnet: `testnet-1`, EIP-155 id 56671 (D1).
@@ -65,7 +68,7 @@ export const konstellation = {
  * `rpcUrls` and `blockExplorers` are empty until `networks/testnet-1/chain.json`
  * lists endpoints; the faucet URL is likewise not known yet.
  */
-export const testnet = {
+export const testnet = /* @__PURE__ */ deepFreeze({
   id: 56671,
   name: "Konstellation Testnet",
   cosmosChainId: "testnet-1",
@@ -77,7 +80,7 @@ export const testnet = {
   },
   contracts: chainContracts,
   testnet: true,
-} as const satisfies KonstellationChain;
+} as const satisfies KonstellationChain);
 
 /**
  * Local dev chain as started by `konstellation/local_node.sh`: Cosmos chain-id
@@ -86,7 +89,7 @@ export const testnet = {
  * any locally initialised chain gets 56670 whatever its Cosmos chain-id is.
  * JSON-RPC defaults to `http://127.0.0.1:8545` (HTTP) and `ws://127.0.0.1:8546`.
  */
-export const localnet = {
+export const localnet = /* @__PURE__ */ deepFreeze({
   id: 56670,
   name: "Konstellation Localnet",
   cosmosChainId: "konstellation-local-1",
@@ -101,14 +104,23 @@ export const localnet = {
   },
   contracts: chainContracts,
   testnet: true,
-} as const satisfies KonstellationChain;
+} as const satisfies KonstellationChain);
 
 /** All networks, keyed by their export name. */
-export const networks = { konstellation, testnet, localnet } as const;
+export const networks = /* @__PURE__ */ deepFreeze({ konstellation, testnet, localnet } as const);
 
-/** All networks, keyed by EIP-155 chain id. */
-export const networksById: Readonly<Record<number, KonstellationChain>> = {
+/**
+ * All networks, keyed by EIP-155 chain id. The keys are the three literal ids,
+ * so indexing with an arbitrary `number` is a type error — use
+ * `getNetworkById` for that.
+ */
+export const networksById = /* @__PURE__ */ deepFreeze({
   [konstellation.id]: konstellation,
   [testnet.id]: testnet,
   [localnet.id]: localnet,
-};
+} as const);
+
+/** Look a network up by EIP-155 chain id; `undefined` for an id that is not Konstellation's. */
+export function getNetworkById(id: number): KonstellationChain | undefined {
+  return (networksById as Readonly<Record<number, KonstellationChain | undefined>>)[id];
+}

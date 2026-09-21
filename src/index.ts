@@ -10,11 +10,12 @@ export type {
   PreinstallAddresses,
 } from "./types.ts";
 
-export { contracts, precompiles, preinstalls } from "./contracts.ts";
+export { contracts, precompiles, preinstalls, wkash } from "./contracts.ts";
 export {
   baseDenom,
   bech32Prefix,
   chainContracts,
+  getNetworkById,
   konstellation,
   localnet,
   nativeCurrency,

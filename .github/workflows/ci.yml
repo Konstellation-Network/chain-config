@@ -16,14 +16,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # ENGINEERING.md §5.2: "chain-config addresses match contracts deployments"
-      # is asserted by test/invariant.test.ts against a sibling checkout of
-      # `contracts`. That repo is private, and the job's GITHUB_TOKEN cannot read
-      # other private repos, so this step needs a fine-grained PAT with
-      # contents:read on Konstellation-Network/contracts stored as the
-      # CONTRACTS_READ_TOKEN secret. Without one the step fails, the test skips
-      # with a message, and the rest of the job still runs — the invariant is
-      # then only enforced locally. Once `contracts` is public the fallback
-      # github.token is enough and the secret can go.
+      # is asserted by test/invariant.test.ts against sibling checkouts of
+      # `contracts` (preinstall + WKASH pins) and `konstellation` (precompile
+      # addresses, chain ids, denom, embedded preinstalls). Both repos are
+      # private and the job's GITHUB_TOKEN cannot read other private repos, so
+      # these steps need a fine-grained PAT with contents:read on both repos
+      # stored as the CONTRACTS_READ_TOKEN secret. Without one the steps fail,
+      # the tests skip with a message, and the rest of the job still runs — the
+      # invariant is then only enforced locally. Once the repos are public the
+      # fallback github.token is enough and the secret can go.
+      #
+      # Whenever a checkout DID succeed, KONSTELLATION_REQUIRE_SIBLINGS=1 makes
+      # the test fail rather than skip if it cannot find the files, so a wrong
+      # path or sparse pattern can never turn into a green run.
       - name: Check out contracts (for the §5.2 invariant test)
         id: contracts
         continue-on-error: true
@@ -32,7 +37,23 @@ jobs:
           repository: Konstellation-Network/contracts
           token: ${{ secrets.CONTRACTS_READ_TOKEN || github.token }}
           path: .siblings/contracts
-          sparse-checkout: preinstalls
+          sparse-checkout: |
+            preinstalls
+            test
+          persist-credentials: false
+
+      - name: Check out konstellation (for the §5.2 invariant test)
+        id: konstellation
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Konstellation-Network/konstellation
+          token: ${{ secrets.CONTRACTS_READ_TOKEN || github.token }}
+          path: .siblings/konstellation
+          sparse-checkout: |
+            app/config
+            app/preinstalls
+            x/compliance/precompile
           persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -45,9 +66,15 @@ jobs:
       - run: npm run build
       - run: npm test
         env:
-          # Absent when the checkout above failed: the test then skips, loudly.
+          # Empty when the checkout above failed: the test then skips, loudly.
           KONSTELLATION_CONTRACTS_DIR: ${{ steps.contracts.outcome == 'success' && format('{0}/.siblings/contracts', github.workspace) || '' }}
+          KONSTELLATION_CHAIN_DIR: ${{ steps.konstellation.outcome == 'success' && format('{0}/.siblings/konstellation', github.workspace) || '' }}
+          KONSTELLATION_REQUIRE_SIBLINGS: ${{ (steps.contracts.outcome == 'success' && steps.konstellation.outcome == 'success') && '1' || '' }}
 
-      - name: Warn if the §5.2 invariant test could not run
+      - name: Warn if the §5.2 invariant test could not run against contracts
         if: steps.contracts.outcome != 'success'
         run: echo "::warning::ENGINEERING.md §5.2 invariant not checked in CI — the contracts checkout failed (set the CONTRACTS_READ_TOKEN secret, or make contracts public). The test still runs locally against ../contracts."
+
+      - name: Warn if the §5.2 invariant test could not run against konstellation
+        if: steps.konstellation.outcome != 'success'
+        run: echo "::warning::precompile addresses / chain ids not checked against konstellation in CI — the konstellation checkout failed (set the CONTRACTS_READ_TOKEN secret with read access to it, or make it public). The test still runs locally against ../konstellation."

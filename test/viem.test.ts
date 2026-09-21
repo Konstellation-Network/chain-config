@@ -28,6 +28,7 @@ describe("viem compatibility", () => {
       assert.equal(chain.baseDenom, "esp");
       assert.equal(chain.contracts.multicall3.address, "0xcA11bde05977b3631167028862bE2a173976CA11");
       assert.equal(chain.contracts.compliance.address, "0x0000000000000000000000000000000000000900");
+      assert.equal(chain.contracts.wkash.address, "0x34Ab8285C63b876717C2c56151700D02623559bE");
     }
   });
 

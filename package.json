@@ -23,6 +23,7 @@
   },
   "files": [
     "dist",
+    "src",
     "README.md"
   ],
   "scripts": {
@@ -50,7 +51,14 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=20"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=22.18",
+      "onFail": "warn"
+    }
   },
   "devDependencies": {
     "@types/node": "26.6.2",

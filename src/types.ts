@@ -98,17 +98,27 @@ export interface PrecompileAddresses {
   /** Konstellation `ICompliance` (D6): read-only `isVerified(address)` / `isFrozen(address)`. */
   readonly compliance: Address;
   /**
-   * The `werc20` native precompile that exposes the base denom (`esp`) to
-   * Solidity as an ERC-20. Registered as the native token pair in the erc20
-   * module's genesis. Distinct from the `WKASH` Solidity wrapper, which is a
-   * post-genesis deploy and not in this package until it has an address.
+   * cosmos/evm's `werc20` native precompile: exposes the base denom (`esp`) to
+   * Solidity through the ERC-20 interface, registered as the native token pair
+   * in the erc20 module's genesis. This is NOT the `WKASH` wrapper contract —
+   * see `ContractAddresses.wkash`.
    */
-  readonly wkash: Address;
+  readonly werc20: Address;
 }
 
 export interface ContractAddresses {
   readonly preinstalls: PreinstallAddresses;
   readonly precompiles: PrecompileAddresses;
+  /**
+   * `WKASH.sol`, the wrapped native token (`contracts/src/WKASH.sol`). A
+   * post-genesis deploy, not a preinstall: `contracts/script/DeployWKASH.s.sol`
+   * deploys it through the preinstalled `create2Deployer` with a fixed salt,
+   * so the address is the same on every network and known before deployment.
+   * Pinned by `contracts/test/DeployWKASH.t.sol`; checked here by
+   * `test/invariant.test.ts`. Until the deploy transaction lands on a
+   * network there is no code at this address on it.
+   */
+  readonly wkash: Address;
 }
 
 /** EIP-3085 `wallet_addEthereumChain` request parameter. */
@@ -122,12 +132,17 @@ export interface AddEthereumChainParameter {
     readonly decimals: number;
   };
   readonly rpcUrls: readonly string[];
+  /**
+   * Present only when non-empty: MetaMask (Mobile, and the extension up to
+   * v12) rejects an empty array, while an absent key is accepted.
+   */
   readonly blockExplorerUrls?: readonly string[];
+  /** Present only when non-empty, for the same reason. */
   readonly iconUrls?: readonly string[];
 }
 
-/** Key of any canonical address: a preinstall or a precompile. The two sets never overlap. */
-export type ContractName = keyof PreinstallAddresses | keyof PrecompileAddresses;
+/** Key of any canonical address: a preinstall, a precompile, or `wkash`. The sets never overlap. */
+export type ContractName = keyof PreinstallAddresses | keyof PrecompileAddresses | "wkash";
 
 /** One Konstellation network: an `EvmChain` plus the Cosmos-side identity. */
 export interface KonstellationChain extends EvmChain {
@@ -138,9 +153,11 @@ export interface KonstellationChain extends EvmChain {
   /** On-chain base unit of the native token; 1 KASH = 10^18 esp. */
   readonly baseDenom: string;
   /**
-   * Every preinstall and precompile, keyed as in `contracts.preinstalls` /
-   * `contracts.precompiles`, in viem's `ChainContract` shape so the whole
-   * object is a valid viem `Chain`. Identical on every network.
+   * Every canonical address, keyed as in `contracts.preinstalls` /
+   * `contracts.precompiles` plus `wkash`, in viem's `ChainContract` shape so
+   * the whole object is a valid viem `Chain`. Identical on every network.
+   * Preinstalls and precompiles carry `blockCreated: 0`; `wkash` has no
+   * `blockCreated` because it is deployed after genesis.
    */
   readonly contracts: { readonly [K in ContractName]: ChainContract } & {
     readonly multicall3: ChainContract & { readonly blockCreated: number };

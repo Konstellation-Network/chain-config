@@ -19,9 +19,9 @@ shaped for [viem](https://viem.sh), [wagmi](https://wagmi.sh) and EIP-3085
 | `localnet` | the dev chain `konstellation/local_node.sh` starts — `konstellation-local-1`, EIP-155 **56670**, JSON-RPC `http://127.0.0.1:8545` |
 | `nativeCurrency` | `{ name: "Konstellation", symbol: "KASH", decimals: 18 }` |
 | `baseDenom`, `bech32Prefix` | `esp` (1 KASH = 10<sup>18</sup> esp), `kons` |
-| `contracts` | `{ preinstalls, precompiles }` — every canonical address, see below |
+| `contracts` | `{ preinstalls, precompiles, wkash }` — every canonical address, see below |
 | `chainContracts` | the same addresses in viem's `ChainContract` shape; what each network's `.contracts` is |
-| `networks`, `networksById` | the three networks keyed by export name / chain id |
+| `networks`, `networksById`, `getNetworkById` | the three networks keyed by export name / literal chain id, and a lookup for any `number` |
 | `addEthereumChainParameters`, `toAddEthereumChainParameter`, `toHexChainId` | EIP-3085 helpers |
 
 Every network object is a valid viem `Chain` **plus** `cosmosChainId`,
@@ -54,10 +54,18 @@ Precompiles — native code at a fixed address, no bytecode:
 | `bech32` | `0x…0400` | bech32 <-> hex |
 | `staking` … `ics02` | `0x…0800` – `0x…0807` | cosmos/evm's staking, distribution, ics20, vesting, bank, gov, slashing, ics02 |
 | `compliance` | `0x…0900` | Konstellation `ICompliance`: `isVerified(address)`, `isFrozen(address)` (D6) |
-| `wkash` | `0xD4949664cD82660AaE99bEdc034a0deA8A0bd517` | `werc20` native precompile exposing `esp` as an ERC-20 |
+| `werc20` | `0xD4949664cD82660AaE99bEdc034a0deA8A0bd517` | cosmos/evm's `werc20` native precompile exposing `esp` through the ERC-20 interface |
 
-`WKASH` the Solidity wrapper is a post-genesis deploy and will be added once it
-has an address.
+Post-genesis deploy — known address, no code until the deploy script has run on
+that network:
+
+| Key | Address | What |
+|---|---|---|
+| `wkash` | `0x34Ab8285C63b876717C2c56151700D02623559bE` | `WKASH.sol`, the wrapped native token, deployed through `create2Deployer` with salt `keccak256("konstellation-network/contracts:WKASH:v1")` — same address on every network; pinned by `contracts/test/DeployWKASH.t.sol` |
+
+`werc20` and `wkash` are different contracts: the precompile is chain-native
+and always there; `WKASH` is ordinary Solidity that must be deployed. Do not
+use one where the other is meant.
 
 ## Usage
 
@@ -108,6 +116,11 @@ await window.ethereum.request({
 addEthereumChainParameters.localnet; // { chainId: "0xdd5e", rpcUrls: ["http://127.0.0.1:8545"], … }
 ```
 
+`blockExplorerUrls` and `iconUrls` are **omitted** from the params until there
+is something to put in them: MetaMask Mobile and the extension up to v12
+reject `[]`, while an absent key is accepted (viem omits it too). Passing
+`{ blockExplorerUrls: [] }` as an override is also normalised to "absent".
+
 ### Contract addresses
 
 ```ts
@@ -115,7 +128,11 @@ import { contracts } from "@konstellation-network/chain-config";
 
 contracts.preinstalls.entryPointV07; // "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 contracts.precompiles.compliance;    // "0x0000000000000000000000000000000000000900"
+contracts.precompiles.werc20;        // "0xD4949664cD82660AaE99bEdc034a0deA8A0bd517" (precompile)
+contracts.wkash;                     // "0x34Ab8285C63b876717C2c56151700D02623559bE" (WKASH.sol, post-genesis)
 ```
+
+Every exported object is deep-frozen; mutating one throws in strict mode.
 
 ### Cosmos side
 
@@ -139,20 +156,35 @@ test time and asserts:
   with the same address, and every entry the package claims is pinned there
   still is — so a new or re-pinned preinstall in `contracts` fails this repo's
   tests until the package is updated;
-- the `ICompliance` precompile address, the `wkash` precompile address, the
-  three EIP-155 ids, the base denom and the symbol match the constants in
-  `konstellation` (`x/compliance/precompile/precompile.go`, `app/config/chain.go`);
+- `contracts.wkash` equals `EXPECTED_WKASH` in `contracts/test/DeployWKASH.t.sol`;
+- the `ICompliance` precompile address, the `werc20` precompile address, the
+  three EIP-155 ids, the three Cosmos chain-ids, the base denom and the symbol
+  match the constants in `konstellation` (`x/compliance/precompile/precompile.go`,
+  `app/config/chain.go`);
 - the preinstalls `konstellation/app/preinstalls` embeds are the same set.
 
 The paths default to `../contracts` and `../konstellation`; override with
-`KONSTELLATION_CONTRACTS_DIR` / `KONSTELLATION_CHAIN_DIR`. When a sibling is
-absent the suite is **skipped with a message**, never passed silently. In CI
-the `contracts` checkout needs a read token because that repo is private (see
-`.github/workflows/ci.yml`); without it the workflow warns.
+`KONSTELLATION_CONTRACTS_DIR` / `KONSTELLATION_CHAIN_DIR`. A sibling missing
+from its default location **skips** its tests with a message (and they count
+as skipped in the summary), never passes silently. It is a **failure** when the
+env var is set explicitly and points nowhere, when
+`KONSTELLATION_REQUIRE_SIBLINGS=1`, or when the sibling is there but the
+expected files are not (a moved `preinstalls/` directory is a failure, not a
+skip). In CI both repos are checked out sparsely with a read token because
+they are private (see `.github/workflows/ci.yml`); the env vars are set only
+for a checkout that succeeded, and the workflow warns for each that did not.
 
 The other five preinstalls come from cosmos/evm v0.7.3's
 `x/vm/types.DefaultPreinstalls` and are not re-checked here; they change only
 with a cosmos/evm bump, which `konstellation/app/upstream_pin_test.go` flags.
+
+## Requirements
+
+- Consumers: Node >= 20 (or any bundler); the shipped JavaScript is plain
+  ES2022 with no runtime dependencies. TypeScript >= 5.0 — the declaration
+  files import `./types.ts` with an explicit extension (viem 2 needs TS 5 too).
+- Development: Node >= 22.18 (`npm test` runs the `.ts` sources directly via
+  Node's type stripping; `devEngines` warns otherwise).
 
 ## Development
 
@@ -160,7 +192,7 @@ with a cosmos/evm bump, which `konstellation/app/upstream_pin_test.go` flags.
 npm install
 npm run typecheck   # tsc --noEmit over src and test
 npm run build       # dist/esm + dist/cjs + .d.ts (tsc, no bundler)
-npm test            # node:test; needs Node >= 22.18 (runs the .ts sources directly)
+npm test            # node:test
 ```
 
 Dev dependencies only: `typescript`, `@types/node`, and `viem` for the
