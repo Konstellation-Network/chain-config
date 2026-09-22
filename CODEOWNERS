@@ -1,0 +1,24 @@
+# Copied from the org `.github` repo's CODEOWNERS.template (GitHub has no
+# org-wide default CODEOWNERS; every repo carries its own — ENGINEERING.md §17).
+#
+# Ownership is shared across engineering, not assigned to individuals
+# (ENGINEERING.md §17), so every path is owned by every current engineer. No
+# GitHub team exists yet; swap this list for a team once one is created.
+# Update the usernames if org membership changes
+# (`gh api orgs/Konstellation-Network/members --jq '.[].login'`).
+
+* @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
+
+# The addresses dapps hard-code (ENGINEERING.md §5.2: they must match
+# `contracts/preinstalls/*.json`), the network identity (§1), and everything
+# that shapes the published artifact or what CI guarantees (the build
+# scripts, the workflows, the dist/invariant tests). Same owners, listed
+# separately so a stricter rule (e.g. two reviewers) can be attached here
+# without touching the catch-all above. CODEOWNERS is last-match-wins.
+/src/contracts.ts          @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
+/src/networks.ts           @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
+/scripts/                  @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
+/test/invariant.test.ts    @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
+/test/dist.test.ts         @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
+/.github/workflows/        @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
+/package.json              @defidevrel @Evangel90 @Levi-Ojukwu @OlolaJaco @Psalmuel01
