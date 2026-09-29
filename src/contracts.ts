@@ -58,5 +58,5 @@ export const precompiles: PrecompileAddresses = /* @__PURE__ */ deepFreeze({
  */
 export const wkash: Address = "0x34Ab8285C63b876717C2c56151700D02623559bE";
 
-/** Every canonical address on Konstellation. The same on all three networks. */
+/** Every canonical address on Konstellation. The same on every network. */
 export const contracts: ContractAddresses = /* @__PURE__ */ deepFreeze({ preinstalls, precompiles, wkash });

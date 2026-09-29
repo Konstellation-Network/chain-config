@@ -23,7 +23,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { contracts, konstellation, localnet, testnet } from "../src/index.ts";
+import { contracts, devnet, konstellation, localnet, testnet } from "../src/index.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const orgRoot = path.resolve(here, "..", "..");
@@ -213,12 +213,14 @@ describe("precompile addresses, chain ids and denom match konstellation", () => 
 
   it("EIP-155 chain ids", { skip: skipChain }, () => {
     assert.equal(konstellation.id, Number(goConst("app/config/chain.go", "EVMChainIDMainnet")));
+    assert.equal(devnet.id, Number(goConst("app/config/chain.go", "EVMChainIDDevnet")));
     assert.equal(testnet.id, Number(goConst("app/config/chain.go", "EVMChainIDTestnet")));
     assert.equal(localnet.id, Number(goConst("app/config/chain.go", "EVMChainIDLocal")));
   });
 
   it("Cosmos chain ids", { skip: skipChain }, () => {
     assert.equal(konstellation.cosmosChainId, goConst("app/config/chain.go", "ChainIDMainnet"));
+    assert.equal(devnet.cosmosChainId, goConst("app/config/chain.go", "ChainIDDevnet"));
     assert.equal(testnet.cosmosChainId, goConst("app/config/chain.go", "ChainIDTestnet"));
     assert.equal(localnet.cosmosChainId, goConst("app/config/chain.go", "ChainIDLocal"));
   });

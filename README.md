@@ -5,8 +5,8 @@ shaped for [viem](https://viem.sh), [wagmi](https://wagmi.sh) and EIP-3085
 `wallet_addEthereumChain`. TypeScript, ESM + CJS, zero runtime dependencies.
 
 > **Not yet published.** Nothing is deployed: no public RPC, no explorer, no
-> testnet. This package is being built ahead of testnet-1 so dapps can integrate
-> against the final chain ids and addresses.
+> devnet or testnet. This package is being built ahead of the public networks so
+> dapps can integrate against the final chain ids and addresses.
 >
 > ```sh
 > npm install @konstellation-network/chain-config   # not yet published — see below
@@ -25,19 +25,33 @@ shaped for [viem](https://viem.sh), [wagmi](https://wagmi.sh) and EIP-3085
 | Export | Value |
 |---|---|
 | `konstellation` | mainnet — Cosmos `konstellation-1`, EIP-155 **5667** |
-| `testnet` | `testnet-1`, EIP-155 **56671** |
+| `devnet` | `devnet-1`, EIP-155 **56672** (`0xdd60`) — **where dapp developers start** |
+| `testnet` | `testnet-1`, EIP-155 **56671** — validator/operations rehearsal network |
 | `localnet` | the dev chain `konstellation/local_node.sh` starts — `konstellation-local-1`, EIP-155 **56670**, JSON-RPC `http://127.0.0.1:8545` |
 | `nativeCurrency` | `{ name: "Konstellation", symbol: "KASH", decimals: 18 }` |
 | `baseDenom`, `bech32Prefix` | `esp` (1 KASH = 10<sup>18</sup> esp), `kons` |
 | `contracts` | `{ preinstalls, precompiles, wkash }` — every canonical address, see below |
 | `chainContracts` | the same addresses in viem's `ChainContract` shape; what each network's `.contracts` is |
-| `networks`, `networksById`, `getNetworkById` | the three networks keyed by export name / literal chain id, and a lookup taking a `number`, a decimal string, or the `0x…` hex string wallets return |
+| `networks`, `networksById`, `getNetworkById` | the four networks keyed by export name / literal chain id, and a lookup taking a `number`, a decimal string, or the `0x…` hex string wallets return |
 | `addEthereumChainParameters`, `toAddEthereumChainParameter`, `toHexChainId` | EIP-3085 helpers |
 
 Every network object is a valid viem `Chain` **plus** `cosmosChainId`,
-`bech32Prefix` and `baseDenom`. The addresses are the same on all three
-networks: preinstalls sit at their canonical mainnet addresses by design
+`bech32Prefix` and `baseDenom`. The addresses are the same on every
+network: preinstalls sit at their canonical mainnet addresses by design
 (`ENGINEERING.md §6.3`) and precompiles are fixed by the chain binary.
+
+### Which network to build on
+
+| Network | For | Validators | Stability |
+|---|---|---|---|
+| `devnet` (`devnet-1`) | **dapp development — start here** | 1, foundation-run | runs the same release as mainnet; faucet-fed; rarely reset |
+| `testnet` (`testnet-1`) | validator operators: upgrade drills, chaos tests, admission rehearsals | 4, foundation-run | new releases land here first; may be disrupted |
+| `konstellation` (`konstellation-1`) | mainnet, real value | 4 foundation-run at genesis; admission permissioned, opening by governance | — |
+
+Upgrades roll out testnet-1 → devnet-1 (1–2 weeks before mainnet) →
+konstellation-1, so code that works on devnet works against the release
+mainnet is about to run. The package has no "default network" export — pick
+one explicitly; the examples below use `devnet`.
 
 ### Addresses
 
@@ -91,34 +105,34 @@ use one where the other is meant.
 
 ```ts
 import { createPublicClient, http } from "viem";
-import { testnet } from "@konstellation-network/chain-config";
+import { devnet } from "@konstellation-network/chain-config";
 
 // No public RPC exists yet — pass your own until rpcUrls is filled in.
-const client = createPublicClient({ chain: testnet, transport: http("https://<your-rpc>") });
+const client = createPublicClient({ chain: devnet, transport: http("https://<your-rpc>") });
 
 // Multicall batching works out of the box: chain.contracts.multicall3 is set.
 const balance = await client.getBalance({ address: "0x…" });
 ```
 
-`defineChain(testnet)` also works and keeps the Cosmos fields; it is not needed
+`defineChain(devnet)` also works and keeps the Cosmos fields; it is not needed
 because the object already has the right shape.
 
 ### wagmi
 
 ```ts
 import { createConfig, http } from "wagmi";
-import { konstellation, testnet } from "@konstellation-network/chain-config";
+import { devnet, konstellation } from "@konstellation-network/chain-config";
 
 export const config = createConfig({
-  chains: [konstellation, testnet],
+  chains: [konstellation, devnet],
   transports: {
     [konstellation.id]: http("https://<your-rpc>"),
-    [testnet.id]: http("https://<your-testnet-rpc>"),
+    [devnet.id]: http("https://<your-devnet-rpc>"),
   },
 });
 ```
 
-`switchChain({ chainId: testnet.id })` will fail on a wallet that does not
+`switchChain({ chainId: devnet.id })` will fail on a wallet that does not
 already know the network: wagmi falls back to `wallet_addEthereumChain` with
 the chain's own `rpcUrls`, which are empty here, and MetaMask requires at
 least one `https://` RPC. Until endpoints are published, pass the parameter
@@ -126,24 +140,24 @@ yourself:
 
 ```ts
 import { switchChain } from "@wagmi/core";
-import { testnet, toAddEthereumChainParameter } from "@konstellation-network/chain-config";
+import { devnet, toAddEthereumChainParameter } from "@konstellation-network/chain-config";
 
 await switchChain(config, {
-  chainId: testnet.id,
-  addEthereumChainParameter: toAddEthereumChainParameter(testnet, { rpcUrls: ["https://<your-testnet-rpc>"] }),
+  chainId: devnet.id,
+  addEthereumChainParameter: toAddEthereumChainParameter(devnet, { rpcUrls: ["https://<your-devnet-rpc>"] }),
 });
 ```
 
 ### Add the network to a wallet (EIP-3085)
 
 ```ts
-import { addEthereumChainParameters, toAddEthereumChainParameter, testnet } from "@konstellation-network/chain-config";
+import { addEthereumChainParameters, devnet, toAddEthereumChainParameter } from "@konstellation-network/chain-config";
 
-// rpcUrls is empty for mainnet and testnet until endpoints are published, and
+// rpcUrls is empty for mainnet, devnet and testnet until endpoints are published, and
 // MetaMask rejects an empty list — pass the endpoints you know about:
 await window.ethereum.request({
   method: "wallet_addEthereumChain",
-  params: [toAddEthereumChainParameter(testnet, { rpcUrls: ["https://<your-rpc>"] })],
+  params: [toAddEthereumChainParameter(devnet, { rpcUrls: ["https://<your-rpc>"] })],
 });
 
 // localnet is complete as shipped:
@@ -200,7 +214,7 @@ test time and asserts:
   tests until the package is updated;
 - `contracts.wkash` equals `EXPECTED_WKASH` in `contracts/test/DeployWKASH.t.sol`;
 - the `ICompliance` precompile address, the `werc20` precompile address, the
-  three EIP-155 ids, the three Cosmos chain-ids, the base denom and the symbol
+  four EIP-155 ids, the four Cosmos chain-ids, the base denom and the symbol
   match the constants in `konstellation` (`x/compliance/precompile/precompile.go`,
   `app/config/chain.go`);
 - the preinstalls `konstellation/app/preinstalls` embeds are the same set.
