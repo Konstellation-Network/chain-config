@@ -224,9 +224,7 @@ out sparsely with a read token because they are private
 (`.github/workflows/ci.yml`, secret `CONTRACTS_READ_TOKEN`); a failed checkout
 fails the job with an explanatory `::error::`. Intended consequences: a PR from
 a fork (no secrets) is red until it is re-run from an org branch, and a
-missing or expired token is red until a maintainer sets it. Until the
-`contracts` branch `vesting-d12` (where `test/DeployWKASH.t.sol` lives) merges,
-CI checks `contracts` out at that branch; drop the `ref:` line afterwards.
+missing or expired token is red until a maintainer sets it.
 
 ### The published artifact is tested too
 

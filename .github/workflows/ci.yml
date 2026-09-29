@@ -32,18 +32,12 @@ jobs:
       # - a missing/expired token → red until a maintainer sets it.
       # Once the repos are public the fallback github.token is enough and the
       # secret can go.
-      #
-      # `ref: vesting-d12` on contracts: the WKASH pin
-      # (test/DeployWKASH.t.sol) lives on that branch until contracts PR
-      # "vesting-d12" merges. Drop the `ref` line then — the checkout going red
-      # when the branch is deleted is the reminder.
       - name: Check out contracts (for the §5.2 invariant test)
         id: contracts
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Konstellation-Network/contracts
-          ref: vesting-d12
           token: ${{ secrets.CONTRACTS_READ_TOKEN || github.token }}
           path: .siblings/contracts
           sparse-checkout: |
