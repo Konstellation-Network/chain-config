@@ -63,7 +63,32 @@ export const konstellation = /* @__PURE__ */ deepFreeze({
 } as const satisfies KonstellationChain);
 
 /**
- * Testnet: `testnet-1`, EIP-155 id 56671 (D1).
+ * Devnet: `devnet-1`, EIP-155 id 56672 (`0xdd60`). **The network dapp
+ * developers start on** (decided 2026-09-29): one foundation-run validator,
+ * the same binary version as mainnet, faucet-fed, rarely reset. Upgrades
+ * reach it after `testnet-1` and 1–2 weeks before `konstellation-1`.
+ *
+ * `rpcUrls` and `blockExplorers` are empty until `networks/devnet-1/chain.json`
+ * lists endpoints; the faucet URL is likewise not known yet.
+ */
+export const devnet = /* @__PURE__ */ deepFreeze({
+  id: 56672,
+  name: "Konstellation Devnet",
+  cosmosChainId: "devnet-1",
+  bech32Prefix,
+  baseDenom,
+  nativeCurrency,
+  rpcUrls: {
+    default: { http: [], webSocket: [] },
+  },
+  contracts: chainContracts,
+  testnet: true,
+} as const satisfies KonstellationChain);
+
+/**
+ * Testnet: `testnet-1`, EIP-155 id 56671 (D1). The validator/operations
+ * rehearsal network — new releases land here first and it may be disrupted
+ * by upgrade drills and chaos tests. Build dapps against `devnet` instead.
  *
  * `rpcUrls` and `blockExplorers` are empty until `networks/testnet-1/chain.json`
  * lists endpoints; the faucet URL is likewise not known yet.
@@ -107,15 +132,16 @@ export const localnet = /* @__PURE__ */ deepFreeze({
 } as const satisfies KonstellationChain);
 
 /** All networks, keyed by their export name. */
-export const networks = /* @__PURE__ */ deepFreeze({ konstellation, testnet, localnet } as const);
+export const networks = /* @__PURE__ */ deepFreeze({ konstellation, devnet, testnet, localnet } as const);
 
 /**
- * All networks, keyed by EIP-155 chain id. The keys are the three literal ids,
+ * All networks, keyed by EIP-155 chain id. The keys are the four literal ids,
  * so indexing with an arbitrary `number` is a type error — use
  * `getNetworkById` for that.
  */
 export const networksById = /* @__PURE__ */ deepFreeze({
   [konstellation.id]: konstellation,
+  [devnet.id]: devnet,
   [testnet.id]: testnet,
   [localnet.id]: localnet,
 } as const);

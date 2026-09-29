@@ -9,6 +9,7 @@ import {
   bech32Prefix,
   chainContracts,
   contracts,
+  devnet,
   konstellation,
   localnet,
   networks,
@@ -23,12 +24,14 @@ import {
 describe("network identity (ENGINEERING.md §1)", () => {
   it("chain ids", () => {
     assert.equal(konstellation.id, 5667);
+    assert.equal(devnet.id, 56672);
     assert.equal(testnet.id, 56671);
     assert.equal(localnet.id, 56670);
   });
 
   it("cosmos chain ids", () => {
     assert.equal(konstellation.cosmosChainId, "konstellation-1");
+    assert.equal(devnet.cosmosChainId, "devnet-1");
     assert.equal(testnet.cosmosChainId, "testnet-1");
     assert.equal(localnet.cosmosChainId, "konstellation-local-1");
   });
@@ -45,6 +48,7 @@ describe("network identity (ENGINEERING.md §1)", () => {
 
   it("only mainnet is not a testnet", () => {
     assert.equal(konstellation.testnet, false);
+    assert.equal(devnet.testnet, true);
     assert.equal(testnet.testnet, true);
     assert.equal(localnet.testnet, true);
   });
@@ -52,21 +56,24 @@ describe("network identity (ENGINEERING.md §1)", () => {
   it("networksById covers every network exactly once and each key is its chain's id", () => {
     assert.deepEqual(
       Object.keys(networksById).map(Number).sort((a, b) => a - b),
-      [5667, 56670, 56671],
+      [5667, 56670, 56671, 56672],
     );
     for (const [k, c] of Object.entries(networksById)) {
       assert.equal(c.id, Number(k), `networksById[${k}] points at chain id ${c.id}`);
     }
     assert.equal(networksById[5667], konstellation);
+    assert.equal(networksById[56672], devnet);
     assert.equal(networksById[56671], testnet);
     assert.equal(networksById[56670], localnet);
   });
 
   it("getNetworkById accepts numbers, decimal and 0x-hex strings, and nothing else", () => {
     assert.equal(getNetworkById(5667), konstellation);
+    assert.equal(getNetworkById(56672), devnet);
     assert.equal(getNetworkById(56671), testnet);
     assert.equal(getNetworkById("5667"), konstellation);
     assert.equal(getNetworkById("0x1623"), konstellation);
+    assert.equal(getNetworkById("0xdd60"), devnet);
     assert.equal(getNetworkById("0xdd5f"), testnet);
     assert.equal(getNetworkById("0xDD5E"), localnet);
     for (const bad of ["__proto__", "constructor", "toString", "hasOwnProperty", "", " 5667", "5667 ", "0x", "0x1623x", "1e4", "-5667", "0x1623".repeat(3)]) {
@@ -99,8 +106,8 @@ describe("network identity (ENGINEERING.md §1)", () => {
     }, TypeError);
   });
 
-  it("no invented endpoints: mainnet and testnet have no RPC or explorer yet", () => {
-    for (const chain of [konstellation, testnet]) {
+  it("no invented endpoints: mainnet, devnet and testnet have no RPC or explorer yet", () => {
+    for (const chain of [konstellation, devnet, testnet]) {
       assert.deepEqual(chain.rpcUrls.default.http, []);
       assert.deepEqual(chain.rpcUrls.default.webSocket, []);
       assert.ok(!("blockExplorers" in chain), "blockExplorers must stay absent until an explorer exists");
@@ -248,6 +255,7 @@ describe("contract addresses", () => {
 describe("EIP-3085 wallet_addEthereumChain", () => {
   it("hex chain ids", () => {
     assert.equal(toHexChainId(5667), "0x1623");
+    assert.equal(toHexChainId(56672), "0xdd60");
     assert.equal(toHexChainId(56671), "0xdd5f");
     assert.equal(toHexChainId(56670), "0xdd5e");
     assert.throws(() => toHexChainId(0), RangeError);
@@ -261,6 +269,8 @@ describe("EIP-3085 wallet_addEthereumChain", () => {
       nativeCurrency: { name: "Konstellation", symbol: "KASH", decimals: 18 },
       rpcUrls: [],
     });
+    assert.equal(addEthereumChainParameters.devnet.chainId, "0xdd60");
+    assert.equal(addEthereumChainParameters.devnet.chainName, "Konstellation Devnet");
     assert.equal(addEthereumChainParameters.testnet.chainId, "0xdd5f");
     assert.deepEqual(addEthereumChainParameters.localnet.rpcUrls, ["http://127.0.0.1:8545"]);
   });

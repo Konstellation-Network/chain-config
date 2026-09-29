@@ -15,6 +15,7 @@ export {
   baseDenom,
   bech32Prefix,
   chainContracts,
+  devnet,
   getNetworkById,
   konstellation,
   localnet,

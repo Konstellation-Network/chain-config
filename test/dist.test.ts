@@ -69,9 +69,9 @@ describe("dist/ matches src/", async () => {
         toAddEthereumChainParameter: typeof src.toAddEthereumChainParameter;
         testnet: typeof src.testnet;
       };
-      for (const id of [5667, 56671, 56670]) assert.equal(d.toHexChainId(id), src.toHexChainId(id));
+      for (const id of [5667, 56672, 56671, 56670]) assert.equal(d.toHexChainId(id), src.toHexChainId(id));
       assert.throws(() => d.toHexChainId(0), RangeError);
-      for (const id of [5667, "56671", "0xdd5e", "__proto__", 1]) {
+      for (const id of [5667, "56671", "0xdd60", "0xdd5e", "__proto__", 1]) {
         assert.deepEqual(d.getNetworkById(id), src.getNetworkById(id), String(id));
       }
       const overrides = { rpcUrls: ["https://rpc.example.invalid"] };

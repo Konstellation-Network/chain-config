@@ -1,5 +1,5 @@
 import { deepFreeze } from "./freeze.ts";
-import { konstellation, localnet, testnet } from "./networks.ts";
+import { devnet, konstellation, localnet, testnet } from "./networks.ts";
 import type { AddEthereumChainParameter, KonstellationChain } from "./types.ts";
 
 /** Hex-encode an EIP-155 chain id the way EIP-3085 / EIP-695 expect (`0x1623`, no padding). */
@@ -69,11 +69,12 @@ export function toAddEthereumChainParameter(
 }
 
 /**
- * Ready-made EIP-3085 params. `rpcUrls` are empty for mainnet and testnet and
+ * Ready-made EIP-3085 params. `rpcUrls` are empty for mainnet, devnet and testnet and
  * no network has `blockExplorerUrls` yet (see above).
  */
 export const addEthereumChainParameters = /* @__PURE__ */ deepFreeze({
   konstellation: toAddEthereumChainParameter(konstellation),
+  devnet: toAddEthereumChainParameter(devnet),
   testnet: toAddEthereumChainParameter(testnet),
   localnet: toAddEthereumChainParameter(localnet),
 } as const);

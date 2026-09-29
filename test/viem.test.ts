@@ -8,19 +8,19 @@ import { describe, it } from "node:test";
 
 import { createPublicClient, defineChain, http, type Chain } from "viem";
 
-import { konstellation, localnet, testnet, type KonstellationChain } from "../src/index.ts";
+import { devnet, konstellation, localnet, testnet, type KonstellationChain } from "../src/index.ts";
 
 describe("viem compatibility", () => {
   it("every network is assignable to viem's Chain type as-is", () => {
-    const chains: readonly Chain[] = [konstellation, testnet, localnet];
-    assert.equal(chains.length, 3);
+    const chains: readonly Chain[] = [konstellation, devnet, testnet, localnet];
+    assert.equal(chains.length, 4);
     // and back: viem's Chain shape does not lose the Cosmos fields at runtime
-    const roundTrip: readonly KonstellationChain[] = [konstellation, testnet, localnet];
+    const roundTrip: readonly KonstellationChain[] = [konstellation, devnet, testnet, localnet];
     assert.equal(roundTrip[0]?.cosmosChainId, "konstellation-1");
   });
 
   it("defineChain accepts every network and keeps the Cosmos fields", () => {
-    for (const network of [konstellation, testnet, localnet]) {
+    for (const network of [konstellation, devnet, testnet, localnet]) {
       const chain = defineChain(network);
       assert.equal(chain.id, network.id);
       assert.equal(chain.cosmosChainId, network.cosmosChainId);
