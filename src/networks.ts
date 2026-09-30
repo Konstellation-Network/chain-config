@@ -2,9 +2,9 @@ import { precompiles, preinstalls, wkash } from "./contracts.ts";
 import { deepFreeze } from "./freeze.ts";
 import type { Address, ChainContract, KonstellationChain } from "./types.ts";
 
-/** Native token, shared by every network (D2: KASH, base denom `esp`, 18 decimals). */
+/** Native token, shared by every network (D2: KASH, base denom `esp`, 18 decimals; name = symbol, decided 2026-09-30). */
 export const nativeCurrency = /* @__PURE__ */ deepFreeze({
-  name: "Konstellation",
+  name: "KASH",
   symbol: "KASH",
   decimals: 18,
 } as const);

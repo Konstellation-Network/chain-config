@@ -38,7 +38,7 @@ describe("network identity (ENGINEERING.md §1)", () => {
 
   it("token", () => {
     for (const chain of Object.values(networks)) {
-      assert.deepEqual(chain.nativeCurrency, { name: "Konstellation", symbol: "KASH", decimals: 18 });
+      assert.deepEqual(chain.nativeCurrency, { name: "KASH", symbol: "KASH", decimals: 18 });
       assert.equal(chain.baseDenom, "esp");
       assert.equal(chain.bech32Prefix, "kons");
     }
@@ -266,7 +266,7 @@ describe("EIP-3085 wallet_addEthereumChain", () => {
     assert.deepEqual(addEthereumChainParameters.konstellation, {
       chainId: "0x1623",
       chainName: "Konstellation",
-      nativeCurrency: { name: "Konstellation", symbol: "KASH", decimals: 18 },
+      nativeCurrency: { name: "KASH", symbol: "KASH", decimals: 18 },
       rpcUrls: [],
     });
     assert.equal(addEthereumChainParameters.devnet.chainId, "0xdd60");

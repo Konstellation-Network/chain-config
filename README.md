@@ -28,7 +28,7 @@ shaped for [viem](https://viem.sh), [wagmi](https://wagmi.sh) and EIP-3085
 | `devnet` | `devnet-1`, EIP-155 **56672** (`0xdd60`) — **where dapp developers start** |
 | `testnet` | `testnet-1`, EIP-155 **56671** — validator/operations rehearsal network |
 | `localnet` | the dev chain `konstellation/local_node.sh` starts — `konstellation-local-1`, EIP-155 **56670**, JSON-RPC `http://127.0.0.1:8545` |
-| `nativeCurrency` | `{ name: "Konstellation", symbol: "KASH", decimals: 18 }` |
+| `nativeCurrency` | `{ name: "KASH", symbol: "KASH", decimals: 18 }` |
 | `baseDenom`, `bech32Prefix` | `esp` (1 KASH = 10<sup>18</sup> esp), `kons` |
 | `contracts` | `{ preinstalls, precompiles, wkash }` — every canonical address, see below |
 | `chainContracts` | the same addresses in viem's `ChainContract` shape; what each network's `.contracts` is |
