@@ -278,3 +278,7 @@ type-compatibility test in `test/viem.test.ts`. There are no runtime dependencie
 When `networks/<net>/chain.json` lists public endpoints and `explorer` is up,
 fill `rpcUrls.default.http` / `.webSocket` and `blockExplorers.default` in
 `src/networks.ts`. Do not add hostnames that are not live.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE). The Konstellation name and logo are trademarks and are not licensed; see the [trademark policy](https://github.com/Konstellation-Network/.github).
