@@ -1,6 +1,7 @@
 {
   "name": "@konstellation-network/chain-config",
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "description": "Chain metadata and canonical contract addresses for the Konstellation network (konstellation-1, devnet-1, testnet-1, local dev), shaped for viem, wagmi and EIP-3085 wallet_addEthereumChain.",
   "private": true,
   "type": "module",
